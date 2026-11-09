@@ -9,7 +9,7 @@ from tkinter import ttk
 from dilseries.gui.dialogs import EditSamplesDialog
 from dilseries.gui.widgets import ScrolledTree
 from dilseries.naming import NamingConfig, Role
-from dilseries.session import PROBLEM_STATUSES, STATUS_CONTROL, STATUS_EXCLUDED
+from dilseries.session import PROBLEM_STATUSES, STATUS_CONTROL
 from dilseries.util import format_datetime, natural_key
 
 ORDERS = {"Step, then repeat": True, "Repeat, then step": False}
@@ -128,7 +128,7 @@ class SamplesTab(ttk.Frame):
             if flt == "Manually edited" and not a.overridden:
                 continue
             tags = ()
-            if a.status == STATUS_EXCLUDED:
+            if not a.included:
                 tags = ("excluded",)
             elif a.status in PROBLEM_STATUSES:
                 tags = ("problem",)

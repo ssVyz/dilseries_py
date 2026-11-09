@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-11-09
+
+### Added
+
+- Importer for Roche Flow result exports (`*_Results.csv`), platform label "Flow": test (assay) per well, target names, Ct and call, worklist date as run date (also applied to controls), release status, purification plate and kit lot, PCR reagent lots.
+- When the same plate is imported from an LC Pro result table and from Flow results, Flow is used and the LC Pro wells are marked "superseded" (shown in the file and run lists and the export overview).
+- Data sheet: "Details" column (Tm, quantitative result) and extra per-sample columns provided by the export.
+
+### Changed
+
+- Results without Ct whose call is not a negative call (e.g. `IC FAILED`, `Invalid`) are shown with their call text in red instead of `-`.
+- Internal controls are recognized by name (`IC`, `CIC`, names ending in `IC` such as `iso-aciIC`) and listed last.
+- "Suggest groups" also starts a new block at a repeated control (e.g. a second NTC) and only acts on plates with unresolved duplicates; on the example plate it now reproduces the real test assignment.
+- Run dates at midnight are displayed as date only.
+
 ## [0.1.1] - 2026-11-09
 
 ### Added

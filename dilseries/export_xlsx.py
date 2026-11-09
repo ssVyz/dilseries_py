@@ -21,13 +21,12 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from dilseries import __version__
-from dilseries.model import Measurement, TargetResult
+from dilseries.model import NEGATIVE_CALLS, Measurement, TargetResult
 from dilseries.naming import NEG_STEP
 from dilseries.session import Series, Session
 from dilseries.util import natural_key
 
 NOT_DETECTED = "-"
-INVALID = "invalid"
 CT_FORMAT = "0.00"
 DATE_FORMAT = "yyyy-mm-dd"
 DATETIME_FORMAT = "yyyy-mm-dd hh:mm"
@@ -44,7 +43,7 @@ _INVALID_FONT = Font(color="C00000")
 _LINK_FONT = Font(color="0563C1", underline="single")
 _CENTER = Alignment(horizontal="center", vertical="center")
 _INVALID_SHEET_CHARS = re.compile(r"[\[\]:*?/\\]")
-_PLATFORM_SHORT = {"cobas 5800": "cobas", "LC Pro": "LCPro"}
+_PLATFORM_SHORT = {"cobas 5800": "cobas", "LC Pro": "LCPro", "Flow": "Flow"}
 
 
 def export_workbook(session: Session, path: str | Path) -> None:
@@ -88,6 +87,9 @@ def _write_overview(ws: Worksheet, session: Session, series: list[Series], sheet
         ws.cell(row, 2, Path(loaded.path).name)
         ws.cell(row, 3, loaded.format_name)
         ws.cell(row, 4, f"{len(loaded.uids)} measurements")
+        superseded = session.superseded_count(loaded.path)
+        if superseded:
+            ws.cell(row, 5, f"{superseded} not used: same plate imported from Flow results")
         row += 1
 
     row += 1
@@ -191,7 +193,7 @@ def _write_ct_cell(cell, session: Session, measurements: list[Measurement], targ
     cell.value = cell_value(shown.result(target))
     if isinstance(cell.value, float):
         cell.number_format = CT_FORMAT
-    elif cell.value == INVALID:
+    elif isinstance(cell.value, str) and cell.value != NOT_DETECTED:
         cell.font = _INVALID_FONT
     if len(measurements) > 1:
         cell.fill = _DUPLICATE_FILL
@@ -231,16 +233,18 @@ def _write_controls(ws: Worksheet, session: Session) -> None:
 
 
 def _write_data(ws: Worksheet, session: Session) -> None:
-    headers = [
-        "Platform", "Source file", "Run ID", "Plate / run", "Run date", "Operator", "Assay / group", "Well",
-        "Sample ID", "Role", "Series", "Step", "Repeat", "Status", "Target", "Channel", "Ct", "Result", "Flags", "Sample flags",
-    ]
-    _header_row(ws, 1, headers)
     ann = session.annotations()
     ordered = sorted(
         (session.measurements[uid] for uid, a in ann.items() if a.included),
         key=lambda m: (m.platform, session.run_datetime(m) or datetime.min, m.plate_id, natural_key(m.well), m.uid),
     )
+    extra_keys = list(dict.fromkeys(k for m in ordered for k in m.extra))
+    headers = [
+        "Platform", "Source file", "Run ID", "Plate / run", "Run date", "Operator", "Assay / group", "Well",
+        "Sample ID", "Role", "Series", "Step", "Repeat", "Status", "Target", "Channel", "Ct", "Result", "Flags",
+        "Details", "Sample flags", *extra_keys,
+    ]
+    _header_row(ws, 1, headers)
     row = 2
     for m in ordered:
         a = ann[m.uid]
@@ -265,7 +269,9 @@ def _write_data(ws: Worksheet, session: Session) -> None:
                 cell_value(r) if r else None,
                 r.call if r else "",
                 r.flags if r else "",
+                r.details if r else "",
                 m.flags,
+                *(m.extra.get(k, "") for k in extra_keys),
             ]
             _data_row(ws, row, values, ct_col=17, date_col=5)
             row += 1
@@ -274,14 +280,16 @@ def _write_data(ws: Worksheet, session: Session) -> None:
 
 # -------------------------------------------------------------------- helpers
 def cell_value(result: TargetResult | None) -> float | str | None:
-    """Ct as number, '-' when not detected, 'invalid' for invalid results, None if not measured."""
+    """Ct as number; '-' when not detected; the call text (e.g. 'IC FAILED', 'Invalid') when no Ct
+    is reported for another reason; None if the target was not measured."""
     if result is None:
         return None
     if result.ct is not None:
         return result.ct
-    if "invalid" in result.call.casefold():
-        return INVALID
-    return NOT_DETECTED
+    call = " ".join(result.call.split())
+    if call.casefold() in NEGATIVE_CALLS:
+        return NOT_DETECTED
+    return call
 
 
 def _series_sheet_name(s: Series) -> str:

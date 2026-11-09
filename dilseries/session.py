@@ -13,7 +13,8 @@ from datetime import datetime
 from pathlib import Path
 
 from dilseries import importers
-from dilseries.model import INTERNAL_CONTROL_TARGETS, Measurement
+from dilseries.importers import flow, lcpro
+from dilseries.model import Measurement, is_internal_control
 from dilseries.naming import NEG_STEP, NamingConfig, ParsedName, Role, parse_names, step_sort_key
 from dilseries.util import natural_key, parse_well
 
@@ -26,7 +27,11 @@ STATUS_UNPARSED = "unparsed"
 STATUS_INCOMPLETE = "incomplete"
 STATUS_CONTROL = "control"
 STATUS_EXCLUDED = "excluded"
+STATUS_SUPERSEDED = "superseded"
 PROBLEM_STATUSES = frozenset({STATUS_DUPLICATE, STATUS_UNPARSED, STATUS_INCOMPLETE})
+
+# platform -> platform whose import of the same plate (barcode) replaces it
+SUPERSEDED_BY = {lcpro.PLATFORM: flow.PLATFORM}
 
 _UNSET = object()
 
@@ -78,6 +83,7 @@ class RunSummary:
     date_source: str  # "export", "user" or "missing"
     operators: list[str]
     count: int
+    superseded_by: str = ""  # platform whose import of the same plate replaces this run
 
 
 @dataclass
@@ -247,9 +253,32 @@ class Session:
         groups.discard("")
         return sorted(groups, key=natural_key)
 
+    def superseding_platform(self, m: Measurement) -> str:
+        """Platform that replaces this measurement because the same plate was imported from it, or ''."""
+        other = SUPERSEDED_BY.get(m.platform)
+        if other and m.plate_id in self._plates_by_platform().get(other, set()):
+            return other
+        return ""
+
+    def _plates_by_platform(self) -> dict[str, set[str]]:
+        plates: dict[str, set[str]] = defaultdict(set)
+        for m in self.measurements.values():
+            plates[m.platform].add(m.plate_id)
+        return plates
+
+    def superseded_count(self, path: str) -> int:
+        ann = self.annotations()
+        return sum(1 for uid in self.files[path].uids if ann[uid].status == STATUS_SUPERSEDED)
+
     def annotations(self) -> dict[int, Annotation]:
         if self._annotations is not None:
             return self._annotations
+        plates = self._plates_by_platform()
+        superseded = {
+            uid
+            for uid, m in self.measurements.items()
+            if m.platform in SUPERSEDED_BY and m.plate_id in plates.get(SUPERSEDED_BY[m.platform], set())
+        }
         names = {m.sample_id for m in self.measurements.values() if not m.is_control}
         parsed, self.layout_notes = parse_names(names, self.naming)
         base: dict[int, Annotation] = {}
@@ -272,8 +301,8 @@ class Session:
                 step=step,
                 repeat=repeat,
                 group=self.group_of(m),
-                included=uid not in self.excluded,
-                status="",
+                included=uid not in self.excluded and uid not in superseded,
+                status=STATUS_SUPERSEDED if uid in superseded else "",
                 overridden=o is not None,
                 layout=p.layout,
             )
@@ -285,7 +314,9 @@ class Session:
 
         result: dict[int, Annotation] = {}
         for uid, a in base.items():
-            if not a.included:
+            if a.status == STATUS_SUPERSEDED:
+                status = STATUS_SUPERSEDED
+            elif not a.included:
                 status = STATUS_EXCLUDED
             elif a.role == Role.CONTROL:
                 status = STATUS_CONTROL
@@ -354,6 +385,7 @@ class Session:
                     date_source=source,
                     operators=operators,
                     count=len(ms),
+                    superseded_by=self.superseding_platform(ms[0]),
                 )
             )
         return sorted(out, key=lambda r: (r.when or datetime.max, r.key))
@@ -369,11 +401,16 @@ class Session:
         return dict(wells)
 
     def suggest_groups(self, key: PlateKey, name_template: str = "Test {}") -> dict[int, str]:
-        """Split a plate into contiguous blocks in which no sample ID occurs twice.
+        """Split a plate into contiguous blocks in which no sample or control name occurs twice.
 
         Wells are walked column-wise and row-wise; the order giving fewer blocks
-        wins. Returns an empty dict when the plate needs no split.
+        wins. A repeated control name (e.g. a second NTC) also starts a new block,
+        as each test usually has its own controls. Returns an empty dict when the
+        plate has no duplicates within its current groups (no split needed, e.g.
+        Flow results, where every well carries its test name).
         """
+        if not self.plate_has_duplicates(key):
+            return {}
         ann = self.annotations()
         wells = self.plate_wells(key)
         positioned = [(parse_well(w), w) for w in wells]
@@ -384,7 +421,7 @@ class Session:
             seen: set[str] = set()
             for _, well in sorted(positioned, key=order):
                 uids = [u for u in wells[well] if ann[u].included]
-                names = {self.measurements[u].sample_id for u in uids if ann[u].role in (Role.SAMPLE, Role.NEGATIVE)}
+                names = {self.measurements[u].sample_id for u in uids if ann[u].role != Role.UNKNOWN}
                 if names & seen:
                     blocks.append([])
                     seen = set()
@@ -405,7 +442,7 @@ class Session:
     def warnings(self) -> list[str]:
         ann = self.annotations()
         out = []
-        missing_dates = [r for r in self.runs() if r.date_source == "missing"]
+        missing_dates = [r for r in self.runs() if r.date_source == "missing" and not r.superseded_by]
         if missing_dates:
             out.append(f"{len(missing_dates)} run(s) without run date: " + ", ".join(r.key[1] for r in missing_dates))
         counts = Counter(a.status for a in ann.values())
@@ -430,5 +467,5 @@ def target_order(measurements: list[Measurement]) -> list[tuple[str, int | None]
                 channels[r.target] = r.channel
     return sorted(
         channels.items(),
-        key=lambda tc: (tc[0].upper() in INTERNAL_CONTROL_TARGETS, tc[1] if tc[1] is not None else 10**6, natural_key(tc[0])),
+        key=lambda tc: (is_internal_control(tc[0]), tc[1] if tc[1] is not None else 10**6, natural_key(tc[0])),
     )

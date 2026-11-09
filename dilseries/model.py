@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
-# Target names treated as internal controls (sorted last in outputs).
-INTERNAL_CONTROL_TARGETS = frozenset({"IC", "CIC"})
+# Target names treated as internal controls (sorted last in outputs): 'IC', 'CIC', or ending in
+# 'IC' after a non-capital (e.g. 'iso-IC', 'iso-aciIC').
+_INTERNAL_CONTROL_TARGET = re.compile(r"^C?IC$|(?:^|[^A-Z])IC$")
+
+# Calls that mean "no Ct because nothing was detected" (shown as '-'); other calls without Ct
+# (e.g. 'IC FAILED', 'Invalid') are shown as text.
+NEGATIVE_CALLS = frozenset({"", "ntd", "nd", "nonreactive", "non-reactive", "negative", "not detected", "valid"})
+
+
+def is_internal_control(target: str) -> bool:
+    return bool(_INTERNAL_CONTROL_TARGET.search(target.strip()))
 
 
 @dataclass
@@ -18,6 +28,7 @@ class TargetResult:
     call: str = ""
     flags: str = ""
     channel: int | None = None
+    details: str = ""
 
 
 @dataclass
@@ -37,6 +48,7 @@ class Measurement:
     external_id: str = ""
     flags: str = ""
     results: list[TargetResult] = field(default_factory=list)
+    extra: dict[str, str] = field(default_factory=dict)
     uid: int = -1
 
     def result(self, target: str) -> TargetResult | None:

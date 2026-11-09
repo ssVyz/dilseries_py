@@ -94,6 +94,51 @@ def lcpro_csv(wells: list[tuple[str, str, dict[str, str]]], plate: str = "PLATE1
     return "\n".join(lines) + "\n"
 
 
+FLOW_HEADER = (
+    "SampleId_1,assayName_11,FinalResult_11,TmValue,CalculatedResult_11,QuantResult1,ConcentrationUnits1,"
+    "PCRPlate_1,WellId_11,PCRTestName_1,ISOBarcodeId_1,Status_1,WorklistSent_1"
+)
+
+
+def flow_csv(
+    wells: list[tuple[str, str, str, dict[str, tuple[str, str]]]],
+    plate: str = "PLATE1",
+    date: str = "10/28/2026",
+    purification: tuple[str, ...] = (),
+    reagents: tuple[tuple[str, str, str, str], ...] = (),
+) -> str:
+    """wells = [(well, sample_id, test, {target: (ct, call)})]. Controls (NTC) get no date, as in real exports."""
+    lines = [FLOW_HEADER]
+    for well, sample, test, targets in wells:
+        sent = "" if sample == "NTC" else date
+        for target, (ct, call) in targets.items():
+            lines.append(f"{sample},{target},{ct},,{call},,UI/ml,{plate},{well},{test},cobasIC,2nd User Approve,{sent}")
+    lines += ["", "PCRTest_1,Reagent_1,Reagent_Type,Lot_1"]
+    lines += [",".join(r) for r in reagents]
+    lines += ["", "PlateId_2,Plate_Type,Reagent_2,Reagent_Type1,Lot_2"]
+    lines += [f"0507253000483175,Purification Plate,{s},MP96 Kit,95950320" for s in purification]
+    return "﻿" + "\r\n".join(lines) + "\r\n"
+
+
+FLOW_WELLS = [
+    ("A1", "NTC", "testA", {"t-FAM": ("", "NTD"), "t-IC": ("", "NTD")}),
+    ("B1", "S2101", "testA", {"t-FAM": ("18.10", "REACTIVE"), "t-IC": ("30.00", "REACTIVE")}),
+    ("C1", "S2102", "testA", {"t-FAM": ("18.30", "REACTIVE"), "t-IC": ("30.10", "REACTIVE")}),
+    ("D1", "S2n01", "testA", {"t-FAM": ("", "NTD"), "t-IC": ("30.20", "REACTIVE")}),
+    ("A2", "S2101", "testB", {"t-VIC": ("", "IC FAILED"), "t-aciIC": ("", "IC FAILED")}),
+    ("B2", "S2102", "testB", {"t-VIC": ("25.50", "REACTIVE"), "t-aciIC": ("", "IC FAILED")}),
+    ("C2", "S2n01", "testB", {"t-VIC": ("", "NTD"), "t-aciIC": ("31.20", "REACTIVE")}),
+]
+
+
+@pytest.fixture
+def flow_file(tmp_path: Path) -> Path:
+    """Flow results for the same plate as `lcpro_file`: two tests (testA, testB) on the same samples."""
+    path = tmp_path / "plate_Results.csv"
+    path.write_text(flow_csv(FLOW_WELLS, purification=("S2101", "S2102")), encoding="utf-8", newline="")
+    return path
+
+
 @pytest.fixture
 def cobas_zip(tmp_path: Path) -> Path:
     """Series S1: steps 1-2 + neg, repeats 01-02, all on one run sharing one control."""

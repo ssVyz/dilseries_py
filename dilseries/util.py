@@ -32,9 +32,12 @@ def parse_user_datetime(text: str) -> datetime | None:
 
 
 def format_datetime(value: datetime | None, with_time: bool = True) -> str:
+    """Format a run date; a time of exactly midnight is treated as 'date only'."""
     if value is None:
         return ""
-    return value.strftime("%Y-%m-%d %H:%M" if with_time else "%Y-%m-%d")
+    if not with_time or (value.hour, value.minute, value.second) == (0, 0, 0):
+        return value.strftime("%Y-%m-%d")
+    return value.strftime("%Y-%m-%d %H:%M")
 
 
 def parse_well(well: str) -> tuple[int, int] | None:

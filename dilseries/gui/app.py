@@ -10,7 +10,7 @@ from tkinter import filedialog, font as tkfont, messagebox, ttk
 
 from dilseries import __version__
 from dilseries.export_xlsx import export_workbook
-from dilseries.importers import FILE_TYPES
+from dilseries.importers import FILE_TYPES, SUPPORTED_DESCRIPTION
 from dilseries.gui.plate_tab import PlateTab
 from dilseries.gui.runs_tab import RunsTab
 from dilseries.gui.samples_tab import SamplesTab
@@ -32,7 +32,7 @@ class App(ttk.Frame):
         toolbar.pack(fill="x")
         ttk.Button(toolbar, text="Add files…", command=self.add_files).pack(side="left")
         ttk.Button(toolbar, text="Export Excel…", command=self.export).pack(side="left", padx=6)
-        ttk.Label(toolbar, text="Supported: cobas 5800 export (.zip/.xml), LC Pro result table (.csv)", foreground="#555555").pack(side="left", padx=12)
+        ttk.Label(toolbar, text=f"Supported: {SUPPORTED_DESCRIPTION}", foreground="#555555").pack(side="left", padx=12)
 
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill="both", expand=True, padx=8, pady=8)

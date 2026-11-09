@@ -48,30 +48,37 @@ class RunsTab(ttk.Frame):
                 ("source", "Date source", 95),
                 ("operator", "Operator", 110),
                 ("count", "Measurements", 110),
+                ("note", "Note", 240),
                 ("files", "Files", 420),
             ],
             height=8,
         )
         self.runs.pack(fill="both", expand=True)
         self.runs.tree.tag_configure("missing", background="#fde2e1")
+        self.runs.tree.tag_configure("superseded", foreground="#8a8a8a")
         self.runs.tree.bind("<Double-1>", lambda e: self._edit_runs())
 
     def refresh(self) -> None:
         s = self.app.session
         self._file_paths = {f"f{i}": path for i, path in enumerate(s.files)}
-        self.files.set_rows(
-            [
-                (iid, (Path(path).name, s.files[path].format_name, len(s.files[path].uids), s.files[path].skipped, "; ".join(s.files[path].warnings)), ())
-                for iid, path in self._file_paths.items()
-            ]
-        )
+        rows = []
+        for iid, path in self._file_paths.items():
+            f = s.files[path]
+            notes = list(f.warnings)
+            superseded = s.superseded_count(path)
+            if superseded:
+                notes.insert(0, f"{superseded} wells not used: same plate imported from Flow results")
+            rows.append((iid, (Path(path).name, f.format_name, len(f.uids), f.skipped, "; ".join(notes)), ()))
+        self.files.set_rows(rows)
         self._run_keys = {}
         rows = []
         for i, r in enumerate(s.runs()):
             iid = f"run{i}"
             self._run_keys[iid] = r.key
-            values = (r.key[0], r.key[1], ", ".join(r.run_ids), format_datetime(r.when), r.date_source, ", ".join(r.operators), r.count, ", ".join(r.files))
-            rows.append((iid, values, ("missing",) if r.date_source == "missing" else ()))
+            note = f"not used: plate imported from {r.superseded_by}" if r.superseded_by else ""
+            values = (r.key[0], r.key[1], ", ".join(r.run_ids), format_datetime(r.when), r.date_source, ", ".join(r.operators), r.count, note, ", ".join(r.files))
+            tags = ("superseded",) if r.superseded_by else ("missing",) if r.date_source == "missing" else ()
+            rows.append((iid, values, tags))
         self.runs.set_rows(rows)
 
     def _remove_files(self) -> None:

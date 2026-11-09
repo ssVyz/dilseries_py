@@ -224,8 +224,11 @@ class PlateTab(ttk.Frame):
                     c.create_text(x0 + cw / 2, y0 + ch / 2, text=self._fit(label, self._small, cw - 6), font=self._small, fill=color)
                 else:
                     c.create_text(x0 + cw / 2, y0 + ch / 2 - ch / 5, text=self._fit(label, self._font, cw - 6), font=self._font, fill=color)
-                    role = ann[uids[0]].role
-                    sub = "excluded" if not included else ("control" if role == Role.CONTROL else ann[uids[0]].group or "")
+                    first = ann[uids[0]]
+                    if not included:
+                        sub = first.status  # "excluded" or "superseded"
+                    else:
+                        sub = "control" if first.role == Role.CONTROL else first.group or ""
                     c.create_text(x0 + cw / 2, y0 + ch / 2 + ch / 4, text=self._fit(sub, self._small, cw - 6), font=self._small, fill="#444444")
                 if is_dup:
                     c.create_text(x0 + cw - 8, y0 + 9, text="!", font=self._font, fill="#b00020")
@@ -380,7 +383,7 @@ class PlateTab(ttk.Frame):
         s = self.app.session
         assignment = s.suggest_groups(key)
         if not assignment:
-            messagebox.showinfo("Suggest groups", "No sample ID occurs twice on this plate; no split needed.", parent=self)
+            messagebox.showinfo("Suggest groups", "No sample occurs twice within a group on this plate; no split needed.", parent=self)
             return
         names = sorted(set(assignment.values()))
         if not messagebox.askyesno(
