@@ -12,3 +12,4 @@ Python 3.13 project managed with uv. Entry point: `main.py`.
 - Do not commit. Git commits are handled by humans.
 - Do not modify `.gitignore` or `CLAUDE.md` without permission.
 - Ask for permission before adding any external dependency.
+- Approved dependencies: `openpyxl` (runtime), `pytest` (dev).

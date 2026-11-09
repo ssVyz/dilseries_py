@@ -1,5 +1,10 @@
+import sys
+
+from dilseries.gui import run
+
+
 def main():
-    print("Hello from dilseries!")
+    run(sys.argv[1:])
 
 
 if __name__ == "__main__":
