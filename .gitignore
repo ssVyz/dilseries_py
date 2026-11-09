@@ -1,3 +1,6 @@
+# folders
+examples/
+
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -8,3 +11,31 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Testing, coverage and tool caches
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
