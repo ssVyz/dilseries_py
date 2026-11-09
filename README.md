@@ -8,6 +8,8 @@ Supported exports:
 - **Flow**: Roche Flow results (`*_Results.csv`) — preferred for LC Pro plates: contains the test per well,
   target names and dates. If the same plate is also loaded as an LC Pro result table, the Flow data is used.
 - **cobas 5800**: result export zip (`*_Export_*.zip` with `ResultData_*.xml`), or a single XML
+- **cobas 8800**: result export XML (one file per test, e.g. `29471_<name>_<date>.xml`); several tests run on the
+  same AD plate are shown as one plate with one group per test. Export times are taken as UTC and shown in local time.
 - **LC Pro**: result table (`*_ResultTable.csv`); contains no dates or test names
 
 ## Usage

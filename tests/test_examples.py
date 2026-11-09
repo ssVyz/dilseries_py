@@ -68,3 +68,23 @@ def test_flow_examples_and_suggested_groups_match_flow_tests(tmp_path):
     s.add_file(EXAMPLES / "lcpro" / "plate2_ResultTable.csv")
     assert {sr.platform for sr in s.series()} == {"Flow"}
     export_workbook(s, tmp_path / "flow_examples.xlsx")
+
+
+@pytest.mark.skipif(not (EXAMPLES / "c8800_example").is_dir(), reason="examples/c8800_example not available")
+def test_c8800_examples_two_tests_on_one_plate(tmp_path):
+    s = Session()
+    for path in sorted((EXAMPLES / "c8800_example").glob("*.xml")):
+        s.add_file(path)
+    assert not s.warnings()
+    statuses = Counter(a.status for a in s.annotations().values())
+    assert statuses == {"ok": 60, "control": 2}
+    assert len(s.runs()) == 1  # both tests ran on the same AD plate
+    series = {(sr.group, sr.prefix): sr for sr in s.series()}
+    assert set(series) == {("U_ISO_CARB2", "LE50"), ("U_ISO_GPR", "LE50")}
+    for key, sr in series.items():
+        assert sr.missing == 0 and sr.duplicates == 0, key
+        assert sr.steps == ["1", "2", "3", "4", "5", "6", "7", "8", "9", "neg"] and sr.repeats == [1, 2, 3]
+    carb2 = series[("U_ISO_CARB2", "LE50")]
+    assert [t for t, _ in carb2.targets] == ["GES", "GIM", "CTXM", "IC"]
+    assert carb2.cells[("3", 2)][0].result("GES").ct == 22.89
+    export_workbook(s, tmp_path / "c8800_examples.xlsx")

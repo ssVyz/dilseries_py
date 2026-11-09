@@ -1,7 +1,7 @@
 [project]
 name = "dilseries"
-version = "0.1.2"
-description = "Import qPCR dilution series exports (Flow, cobas 5800, LC Pro) and assemble them into Excel overviews."
+version = "0.1.3"
+description = "Import qPCR dilution series exports (Flow, cobas 5800, cobas 8800, LC Pro) and assemble them into Excel overviews."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

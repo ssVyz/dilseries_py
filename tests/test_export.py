@@ -20,8 +20,8 @@ def test_export_cobas_series(cobas_zip, tmp_path):
     export_workbook(s, out)
 
     wb = load_workbook(out)
-    assert wb.sheetnames == ["Overview", "S1 U_TEST cobas", "Controls", "Data"]
-    ws = wb["S1 U_TEST cobas"]
+    assert wb.sheetnames == ["Overview", "S1 U_TEST c5800", "Controls", "Data"]
+    ws = wb["S1 U_TEST c5800"]
     t1 = _find_row(ws, "T1 (Ch.1)")
     header = t1 + 2
     assert [ws.cell(header, c).value for c in range(1, 7)] == ["Day", "Operator", "Repeat", 1, 2, "neg"]

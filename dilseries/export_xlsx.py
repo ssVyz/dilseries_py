@@ -43,7 +43,7 @@ _INVALID_FONT = Font(color="C00000")
 _LINK_FONT = Font(color="0563C1", underline="single")
 _CENTER = Alignment(horizontal="center", vertical="center")
 _INVALID_SHEET_CHARS = re.compile(r"[\[\]:*?/\\]")
-_PLATFORM_SHORT = {"cobas 5800": "cobas", "LC Pro": "LCPro", "Flow": "Flow"}
+_PLATFORM_SHORT = {"cobas 5800": "c5800", "cobas 8800": "c8800", "LC Pro": "LCPro", "Flow": "Flow"}
 
 
 def export_workbook(session: Session, path: str | Path) -> None:

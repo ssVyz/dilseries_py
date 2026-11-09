@@ -172,3 +172,94 @@ def lcpro_file(tmp_path: Path) -> Path:
     path = tmp_path / "plate_ResultTable.csv"
     path.write_text(lcpro_csv(wells), encoding="utf-8")
     return path
+
+
+C8800_RUN = "0bd71b8f-1ddc-f111-81c2-000060ee1342"
+C8800_PLATE = "0302280909603233"
+
+
+def _c8800_order(index: int, sample: str, well: str, targets: dict[str, str], start: str, failed: bool) -> str:
+    control = sample.startswith("(")
+    results = []
+    for channel, (target, ct) in enumerate(targets.items(), start=1):
+        call = "Valid" if control else "Reactive" if ct else "NonReactive"
+        ct_attr = f' CT="{ct}"' if ct else ""
+        results.append(f'<TestResult Name="{target}" Channel="{channel}" Result="{call}" FinalQualification="{call}"{ct_attr}/>')
+    if control:
+        specimen = (
+            f'<RDControl Barcode="C123" Info="{sample}" Position="1614-2" SpecimenClass="C" ControlType="NC">'
+            '<Container><Carrier LotNumber="N30167"/></Container></RDControl>'
+        )
+    else:
+        specimen = f'<Sample Barcode="{sample}" Position="0025-{index + 1}" SpecimenClass="S"/>'
+    flag = '<Flag Code="P01" Description="Clot detected"/>' if failed else ""
+    raw_well = f"{well[0]}{int(well[1:]):02d}"
+    return f"""<TestOrder Id="{{test}}-order-{index}" CreationDateTime="2026-11-09T09:12:00.000000" CT_IC="31.5" ICResult="1"
+  IsRetest="No" TestRequested="test-1">
+<TestResults>{"".join(results)}</TestResults>
+<ProcessOrders>
+  <ProcessOrder ProcessRequested="st-{index}" Failed="0">
+    <ProcessRun ModuleId="SampleCell" RunId="{C8800_RUN}" StartTime="{start}"/><Flags/>
+    <InventoryItemTrackings><InventoryItemTracking><Container Position="{well}"><Carrier InventoryItemId="0102280805806960"/></Container></InventoryItemTracking></InventoryItemTrackings>
+  </ProcessOrder>
+  <ProcessOrder ProcessRequested="ng-{index}" Failed="{int(failed)}">
+    <ProcessRun ModuleId="ProcessCellA" RunId="{C8800_RUN}" StartTime="2026-11-09T09:34:08.191398"/><Flags>{flag}</Flags>
+    <InventoryItemTrackings>
+      <InventoryItemTracking><Carrier LotNumber="KIT_031126.P04542" MaterialNumber="U_TEST.9052011190_A"/></InventoryItemTracking>
+      <InventoryItemTracking><ReagentContainer ReagentName="Lysis" LotNumber="P14437"/></InventoryItemTracking>
+      <InventoryItemTracking><ReagentContainer ReagentName="MGP" LotNumber="P13459"/></InventoryItemTracking>
+    </InventoryItemTrackings>
+  </ProcessOrder>
+  <ProcessOrder ProcessRequested="pcr-{index}" Failed="0">
+    <ProcessRun ModuleId="AnalyticCyclerA1" RunId="{C8800_RUN}" StartTime="2026-11-09T10:32:55.671313"/><Flags/>
+    <InventoryItemTrackings><InventoryItemTracking><Container Position="{well}"><Carrier InventoryItemId="{C8800_PLATE}"/></Container></InventoryItemTracking></InventoryItemTrackings>
+    <ProcessResult><ProcessResultData><RawData><Wells><Well Position="1" PositionName="{raw_well}"/></Wells></RawData></ProcessResultData></ProcessResult>
+  </ProcessOrder>
+</ProcessOrders>
+<OrderGroups><OrderGroup OrderId="29471" Info="{{test}} V01.00 (08/05/2020 09:19:29)"><Flags/></OrderGroup></OrderGroups>
+<Specimen>{specimen}</Specimen>
+</TestOrder>"""
+
+
+def c8800_xml(
+    samples: list[tuple[str, str, dict[str, str]]],
+    *,
+    test: str = "U_TEST_01.00",
+    operator: str = "alice",
+    start: str = "2026-11-09T09:18:20.614547",
+    failed_well: str = "",
+) -> str:
+    """cobas 8800 export of one test. samples = [(sample_id, well, {target: ct})]; empty ct = not detected.
+    A sample ID starting with '(' becomes the run's control; its processes are requested by the instrument."""
+    orders = "".join(
+        _c8800_order(i, sample, well, targets, start, well == failed_well).replace("{test}", test)
+        for i, (sample, well, targets) in enumerate(samples)
+    )
+    requested = []
+    for i, (sample, _, _) in enumerate(samples):
+        for kind, name in (("st", "ST Sample Transfer"), ("ng", "NG Sample Preparation"), ("pcr", "PCR_0003033")):
+            actor = "IM1000-005425" if sample.startswith("(") or kind == "pcr" else operator
+            requested.append(f'<ProcessRequested Id="{kind}-{i}" Name="{name}" CreationActorId="{actor}"/>')
+    return f"""<?xml version="1.0" encoding="utf-8"?>
+<DomainObjects Version="2.0" ApplicationName="c8800System" SoftwareVersion="01.04.07.1003" UserId="exporter">
+<TestOrders>{orders}</TestOrders>
+<TestsRequested><TestRequested Id="test-1" Name="{test}" CreationActorId="admin"/></TestsRequested>
+<ProcessesRequested>{"".join(requested)}</ProcessesRequested>
+</DomainObjects>
+"""
+
+
+C8800_SAMPLES = [
+    ("(-) Ctrl", "A1", {"T1": "", "T2": ""}),
+    ("S3101", "B1", {"T1": "20.5", "T2": "22.1"}),
+    ("S3102", "C1", {"T1": "20.7", "T2": ""}),
+    ("S3n01", "D1", {"T1": "", "T2": ""}),
+    ("S3n02", "E1", {"T1": "", "T2": ""}),
+]
+
+
+@pytest.fixture
+def c8800_file(tmp_path: Path) -> Path:
+    path = tmp_path / "29471_s3_test_2026_11_09_13_50_37.xml"
+    path.write_text(c8800_xml(C8800_SAMPLES, failed_well="E1"), encoding="utf-8")
+    return path

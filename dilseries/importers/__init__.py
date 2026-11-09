@@ -9,17 +9,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dilseries.importers import cobas5800, flow, lcpro
+from dilseries.importers import cobas5800, cobas8800, flow, lcpro
 from dilseries.model import ImportResult, UnsupportedFileError
 
-IMPORTERS = (cobas5800, flow, lcpro)
+IMPORTERS = (cobas5800, cobas8800, flow, lcpro)
 
-SUPPORTED_DESCRIPTION = "Flow results (.csv), cobas 5800 export (.zip/.xml), LC Pro result table (.csv)"
+SUPPORTED_DESCRIPTION = (
+    "Flow results (.csv), cobas 5800 export (.zip/.xml), cobas 8800 export (.xml), LC Pro result table (.csv)"
+)
 
 FILE_TYPES = [
     ("Supported exports", "*.zip *.xml *.csv"),
     ("Flow results", "*.csv"),
     ("cobas 5800 export", "*.zip *.xml"),
+    ("cobas 8800 export", "*.xml"),
     ("LC Pro result table", "*.csv"),
     ("All files", "*.*"),
 ]

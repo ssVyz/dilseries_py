@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-11-09
+
+### Added
+
+- Importer for cobas 8800 result exports (`DomainObjects` XML, `ApplicationName="c8800System"`), platform label "cobas 8800": test (version suffix removed, e.g. `U_ISO_CARB2`), target Ct and call, IC Ct, AD plate barcode and well, run ID, run start, operator (user who requested the processes; controls get the operator of their run). Extra columns: test definition, sample rack position, reagent cassette lot, system reagent lots, control lot. Failed processes and flags are recorded as sample flags. Large exports are read incrementally.
+- Two tests run on the same AD plate appear as one plate/run with one group per test.
+
+### Changed
+
+- Sheet name suffix for cobas 5800 series is now `c5800` (was `cobas`), to distinguish it from `c8800`.
+
 ## [0.1.2] - 2026-11-09
 
 ### Added
